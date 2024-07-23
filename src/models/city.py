@@ -1,24 +1,63 @@
-from datetime import datetime
+"""
+City class
+"""
 
-class City:
-    cities = []
+from typing import Any
+from src.models.base import Base
+from src.models.country import Country
 
-    def __init__(self, name, country):
-        self.id = len(City.cities) + 1
+
+class City(Base):
+
+    name: str
+    country_code: str
+
+    def __init__(self, name: str, country_code: str, **kw) -> None:
+        super().__init__(**kw)
+
         self.name = name
-        self.country = country
-        self.created_at = datetime.now()
-        self.updated_at = datetime.now()
+        self.country_code = country_code
 
-        # Ensure country is a Country instance
-        if not isinstance(country, Country):
-            raise TypeError("Country must be a Country instance")
-        
-        country.add_city(self)
-        City.cities.append(self)
+    def __repr__(self) -> str:
+        return super().__repr__()
 
-    def update(self, **kwargs):
-        for key, value in kwargs.items():
-            if hasattr(self, key):
-                setattr(self, key, value)
-        self.updated_at = datetime.now()
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "country_code": self.country_code,
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+        }
+
+    @staticmethod
+    def create(data: dict) -> "City":
+        """
+        Creates Cities.
+        """
+        from src.persistence import repo
+
+        country = Country.get(data["country_code"])
+        if not country:
+            raise ValueError("Country not found")
+
+        city = City(**data)
+        repo.save(city)
+        return city
+
+    @staticmethod
+    def update(city_id: str, data: dict) -> "City":
+        """
+        Updates an existing City instance.
+        """
+        from src.persistence import repo
+
+        city = City.get(city_id)
+        if not city:
+            raise ValueError("City not found")
+
+        for key, value in data.items():
+            setattr(city, key, value)
+
+        repo.update(city)
+        return city

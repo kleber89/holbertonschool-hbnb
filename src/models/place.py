@@ -1,32 +1,104 @@
-from datetime import datetime
+""" 
+    Place class
+"""
 
-class Place:
-    places = []
+from src.models.base import Base
+from src.models.city import City
+from src.models.user import User
 
-    def __init__(self, name, host, latitude, longitude, price_per_night, max_guests):
-        self.id = len(Place.places) + 1
-        self.name = name
-        self.host = host
-        self.latitude = latitude
-        self.longitude = longitude
-        self.price_per_night = price_per_night
-        self.max_guests = max_guests
-        self.created_at = datetime.now()
-        self.updated_at = datetime.now()
-        self.amenities = []
-        
-        # Ensure host is a User instance
-        if not isinstance(host, User):
-            raise TypeError("Host must be a User instance")
-        
-        Place.places.append(self)
 
-    def update(self, **kwargs):
-        for key, value in kwargs.items():
-            if hasattr(self, key):
-                setattr(self, key, value)
-        self.updated_at = datetime.now()
+class Place(Base):
+    """Place"""
 
-    def add_amenity(self, amenity):
-        if amenity not in self.amenities:
-            self.amenities.append(amenity)
+    name: str
+    description: str
+    address: str
+    latitude: float
+    longitude: float
+    host_id: str
+    city_id: str
+    price_per_night: int
+    number_of_rooms: int
+    number_of_bathrooms: int
+    max_guests: int
+
+    def __init__(self, data: dict = None, **kwargs) -> None:
+        """
+        Initializes a Place instance.
+        """
+        super().__init__(**kwargs)
+        if data:
+            self.name = data.get("name", "")
+            self.description = data.get("description", "")
+            self.address = data.get("address", "")
+            self.latitude = float(data.get("latitude", 0.0))
+            self.longitude = float(data.get("longitude", 0.0))
+            self.host_id = data["host_id"]
+            self.city_id = data["city_id"]
+            self.price_per_night = int(data.get("price_per_night", 0))
+            self.number_of_rooms = int(data.get("number_of_rooms", 0))
+            self.number_of_bathrooms = int(data.get("number_of_bathrooms", 0))
+            self.max_guests = int(data.get("max_guests", 0))
+
+    def __repr__(self) -> str:
+        """
+        String representation of the Place instance.
+        """
+        return f"<Place {self.id} ({self.name})>"
+
+    def to_dict(self) -> dict:
+        """
+        Dictionary representation of the Place instance.
+        """
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "address": self.address,
+            "latitude": self.latitude,
+            "longitude": self.longitude,
+            "city_id": self.city_id,
+            "host_id": self.host_id,
+            "price_per_night": self.price_per_night,
+            "number_of_rooms": self.number_of_rooms,
+            "number_of_bathrooms": self.number_of_bathrooms,
+            "max_guests": self.max_guests,
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+        }
+
+    @staticmethod
+    def create(data: dict) -> "Place":
+        """
+        Creates a new Place instance.
+        """
+        from src.persistence import repo
+
+        user = User.get(data["host_id"])
+        if not user:
+            raise ValueError(f"User with ID {data['host_id']} not found")
+
+        city = City.get(data["city_id"])
+        if not city:
+            raise ValueError(f"City with ID {data['city_id']} not found")
+
+        new_place = Place(data=data)
+        repo.save(new_place)
+        return new_place
+
+    @staticmethod
+    def update(place_id: str, data: dict) -> "Place | None":
+        """
+        Updates an existing Place instance.
+        """
+        from src.persistence import repo
+
+        place = Place.get(place_id)
+        if not place:
+            return None
+
+        for key, value in data.items():
+            setattr(place, key, value)
+
+        repo.update(place)
+        return place

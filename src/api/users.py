@@ -1,66 +1,27 @@
-@ns.route('/')
-class UserList(Resource):
-    @ns.marshal_list_with(user_model)
-    def get(self):
-        """List all users"""
-        users = data_manager.storage['User'].values()
-        return list(users)
+"""
+Routes the users blueprint.
+"""
 
-    @ns.expect(user_model, validate=True)
-    @ns.marshal_with(user_model, code=201)
-    @ns.response(409, 'Email already exists', error_model)
-    def post(self):
-        """Create a new user"""
-        data = request.json
-        email = data['email']
-        if any(user.email == email for user in data_manager.storage['User'].values()):
-            api.abort(409, "Email already exists")
+from flask import Blueprint
+from src.controllers.users import (
+    create_user,
+    delete_user,
+    get_user_by_id,
+    get_users,
+    update_user,
+)
 
-        user = User(id=len(data_manager.storage['User']) + 1,
-                    email=email,
-                    first_name=data['first_name'],
-                    last_name=data['last_name'])
-        data_manager.save(user)
-        return user, 201
+# Create a Blueprint for users with a URL prefix
+users_bp = Blueprint("users", __name__, url_prefix="/users")
 
-@ns.route('/<int:user_id>')
-@ns.response(404, 'User not found', error_model)
-class User(Resource):
-    @ns.marshal_with(user_model)
-    def get(self, user_id):
-        """Fetch a user given its identifier"""
-        user = data_manager.get(user_id, 'User')
-        if user is None:
-            api.abort(404, "User not found")
-        return user
+# Route to get all users
+users_bp.route("/", methods=["GET"])(get_users)
+# Route to create a new user
+users_bp.route("/", methods=["POST"])(create_user)
 
-    @ns.expect(user_model, validate=True)
-    @ns.marshal_with(user_model)
-    @ns.response(404, 'User not found', error_model)
-    def put(self, user_id):
-        """Update a user given its identifier"""
-        user = data_manager.get(user_id, 'User')
-        if user is None:
-            api.abort(404, "User not found")
-
-        data = request.json
-        user.email = data['email']
-        user.first_name = data['first_name']
-        user.last_name = data['last_name']
-        user.updated_at = datetime.now()
-        data_manager.update(user)
-        return user
-
-    @ns.response(204, 'User deleted')
-    @ns.response(404, 'User not found', error_model)
-    def delete(self, user_id):
-        """Delete a user given its identifier"""
-        user = data_manager.get(user_id, 'User')
-        if user is None:
-            api.abort(404, "User not found")
-
-        data_manager.delete(user_id, 'User')
-        return '', 204
-
-if __name__ == '__main__':
-    app.run(debug=True)
+# Route to get a specific user by ID
+users_bp.route("/<string:user_id>", methods=["GET"])(get_user_by_id)
+# Route to update a specific user by ID
+users_bp.route("/<string:user_id>", methods=["PUT"])(update_user)
+# Route to delete a specific user by ID
+users_bp.route("/<string:user_id>", methods=["DELETE"])(delete_user)
