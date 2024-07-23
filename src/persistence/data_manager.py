@@ -1,12 +1,12 @@
 class DataManager(IPersistenceManager):
     def __init__(self):
         self.storage = {
-            'User': {},
-            'Place': {},
-            'Review': {},
-            'Amenity': {},
-            'Country': {},
-            'City': {}
+            "User": {},
+            "Place": {},
+            "Review": {},
+            "Amenity": {},
+            "Country": {},
+            "City": {},
         }
 
     def save(self, entity):

@@ -1,18 +1,13 @@
 from flask import Flask, request, jsonify
 from flask_restx import Api, Resource, fields
-from datetime import datetime
-from models.user import DataManager, User  # Ensure to import your DataManager and User class
+from models import DataManager, User
 
 app = Flask(__name__)
-api = Api(app, version='1.0', title='User API',
-          description='A simple User API',)
-
+api = Api(app, version='1.0', title='User API', description='A simple User API')
 ns = api.namespace('users', description='User operations')
 
-# DataManager instance
 data_manager = DataManager()
 
-# User model for documentation
 user_model = api.model('User', {
     'id': fields.Integer(readOnly=True, description='The unique identifier of a user'),
     'email': fields.String(required=True, description='User email'),
@@ -22,7 +17,68 @@ user_model = api.model('User', {
     'updated_at': fields.DateTime(readOnly=True, description='Time of last update')
 })
 
-# Response model for errors
-error_model = api.model('Error', {
-    'message': fields.String(description='Error message')
-})
+@ns.route('/')
+class UserList(Resource):
+    @ns.marshal_list_with(user_model)
+    def get(self):
+        """List all users"""
+        users = data_manager.storage['User'].values()
+        return list(users)
+
+    @ns.expect(user_model, validate=True)
+    @ns.marshal_with(user_model, code=201)
+    def post(self):
+        """Create a new user"""
+        data = request.json
+        email = data['email']
+        if any(user.email == email for user in data_manager.storage['User'].values()):
+            api.abort(409, "Email already exists")
+
+        user = User(id=len(data_manager.storage['User']) + 1,
+                    email=email,
+                    first_name=data['first_name'],
+                    last_name=data['last_name'])
+        data_manager.save(user)
+        return user, 201
+
+@ns.route('/<int:user_id>')
+@ns.response(404, 'User not found')
+class UserResource(Resource):
+    @ns.marshal_with(user_model)
+    def get(self, user_id):
+        """Fetch a user given its identifier"""
+        user = data_manager.get(user_id, 'User')
+        if user is None:
+            api.abort(404, "User not found")
+        return user
+
+    @ns.expect(user_model, validate=True)
+    @ns.marshal_with(user_model)
+    @ns.response(404, 'User not found')
+    def put(self, user_id):
+        """Update a user given its identifier"""
+        user = data_manager.get(user_id, 'User')
+        if user is None:
+            api.abort(404, "User not found")
+
+        data = request.json
+        user.email = data['email']
+        user.first_name = data['first_name']
+        user.last_name = data['last_name']
+        user.updated_at = datetime.now()
+        data_manager.update(user)
+        return user
+
+    @ns.response(204, 'User deleted')
+    @ns.response(404, 'User not found')
+    def delete(self, user_id):
+        """Delete a user given its identifier"""
+        user = data_manager.get(user_id, 'User')
+        if user is None:
+            api.abort(404, "User not found")
+
+        data_manager.delete(user_id, 'User')
+        return '', 204
+
+if __name__ == '__main__':
+    app.run(debug=True)
